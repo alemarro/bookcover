@@ -1,0 +1,861 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Book Cover Mockup Generator</title>
+    <style>
+        body {
+            font-family: sans-serif;
+            margin: 20px;
+            background-color: #f4f4f4;
+            color: #333;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+        #appContainer {
+            display: flex;
+            flex-wrap: wrap;
+            justify-content: center;
+            gap: 20px;
+            width: 100%;
+            max-width: 1200px;
+        }
+        #controls, #imageSpecOutputContainer {
+            background-color: #fff;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 0 10px rgba(0,0,0,0.1);
+            margin-bottom: 20px;
+            width: 100%;
+            max-width: 450px; /* Adjusted for side-by-side layout */
+            box-sizing: border-box;
+        }
+        label {
+            display: block;
+            margin-top: 10px;
+            margin-bottom: 5px;
+            font-weight: bold;
+        }
+        input[type="file"], input[type="number"], input[type="color"], select, button {
+            width: calc(100% - 22px);
+            padding: 10px;
+            margin-bottom: 10px;
+            border: 1px solid #ddd;
+            border-radius: 4px;
+            box-sizing: border-box;
+        }
+        button {
+            background-color: #007bff;
+            color: white;
+            cursor: pointer;
+            border: none;
+        }
+        button:hover {
+            background-color: #0056b3;
+        }
+        #canvasContainer {
+            /* Default dimensions, will be overridden by JS for fixed sizes */
+            width: 100%;
+            max-width: 600px; /* Default max-width */
+            height: 450px; /* Default height */
+            background-color: #e0e0e0;
+            border: 1px solid #ccc;
+            border-radius: 8px;
+            overflow: hidden;
+            margin-bottom: 20px;
+        }
+        #bookCanvas {
+            display: block;
+            width: 100% !important;
+            height: 100% !important;
+        }
+        .info, #imageSpecOutputContainer p, #imageSpecOutputContainer li {
+            font-size: 0.9em;
+            color: #555;
+            margin-bottom: 8px;
+            line-height: 1.4;
+        }
+        #imageSpecOutputContainer h4 {
+            margin-top: 0;
+        }
+        #imageSpecOutputContainer ul {
+            padding-left: 20px;
+            margin-top: 5px;
+        }
+    </style>
+</head>
+<body>
+    <h1>Book Cover Mockup Generator</h1>
+
+    <div id="appContainer">
+        <div id="controls">
+            <label for="coverUpload">Upload Cover Image (Spread: Front | Spine | Back):</label>
+            <input type="file" id="coverUpload" accept="image/*">
+            <div class="info">
+                Your image should be a full spread: **Front Cover (left) | Spine (middle) | Back Cover (right)**.
+                The tool will map these sections based on the dimensions below.
+            </div>
+
+            <label for="bookCoverWidth">Front Cover Width (cm):</label>
+            <input type="number" id="bookCoverWidth" value="15" step="0.1">
+
+            <label for="bookHeight">Cover Height (cm):</label>
+            <input type="number" id="bookHeight" value="23" step="0.1">
+
+            <label for="spineWidth">Spine Width (cm):</label>
+            <input type="number" id="spineWidth" value="2.5" step="0.1">
+
+            <label for="backgroundUpload">Upload Background Image (Optional):</label>
+            <input type="file" id="backgroundUpload" accept="image/*">
+
+            <label for="backgroundScale">Background Image Scale:</label>
+            <input type="range" id="backgroundScale" min="0.1" max="5" step="0.05" value="1">
+
+            <label for="backgroundOffsetX">Background X Offset:</label>
+            <input type="range" id="backgroundOffsetX" min="-1" max="1" step="0.01" value="0">
+
+            <label for="backgroundOffsetY">Background Y Offset:</label>
+            <input type="range" id="backgroundOffsetY" min="-1" max="1" step="0.01" value="0">
+            
+            <label for="pageColor">Page Edge Color:</label>
+            <input type="color" id="pageColor" value="#f0f0e0">
+
+            <label for="videoSize">Canvas Aspect Ratio:</label>
+            <select id="videoSize">
+                <option value="default_responsive">Default (Responsive Height)</option>
+                <option value="instagram_post_1080x1080">Instagram Post (1080x1080)</option>
+                <option value="instagram_story_1080x1920">Instagram Story (1080x1920)</option>
+                <option value="hd_720p_1280x720">720p HD (1280x720)</option>
+                <option value="hd_1080p_1920x1080">1080p HD (1920x1080)</option>
+            </select>
+
+            <button id="renderVideoButton">Render 360 Video</button>
+            <button id="updateButton">Update Mockup</button>
+            <button id="downloadGlb">Download GLB</button>
+            <div id="renderStatus" style="margin-top: 10px; font-weight: bold; min-height: 1.2em;"></div>
+        </div>
+
+        <div id="imageSpecOutputContainer">
+            <h4>Recommended Image Specifications:</h4>
+            <p>For current book dimensions, your spread image (Front | Spine | Back) should ideally be:</p>
+            <p>Total Spread Aspect Ratio (Width / Height): <strong id="idealAspectRatio">N/A</strong></p>
+            <p>Example Pixel Dimensions:</p>
+            <ul id="sampleResolutions">
+                <li>Enter book dimensions to see examples.</li>
+            </ul>
+            <p class="info">
+                The tool will 'cover' each book face with the corresponding image section,
+                preserving aspect ratio and cropping if necessary. Using an image close to the ideal
+                aspect ratio for the entire spread will minimize cropping.
+            </p>
+
+            <div id="shareGuide" style="margin-top: 20px; padding-top: 15px; border-top: 1px solid #eee;">
+                <h4>Share Your Video:</h4>
+                <p class="info">
+                    After rendering your video:
+                </p>
+                <ul>
+                    <li>On supported devices (especially mobile), a share dialog may appear, allowing you to send the video directly to apps like Instagram.</li>
+                    <li>If sharing is not available, fails, or is cancelled, the video file (e.g., .webm) will be downloaded to your device.</li>
+                    <li>You can then manually upload this downloaded file to Instagram, Facebook, or other platforms.</li>
+                </ul>
+                <p class="info">
+                    <strong>Tip:</strong> For best results, check the recommended video specifications (aspect ratio, length, format) for each platform before uploading.
+                </p>
+            </div>
+        </div>
+    </div>
+
+    <div id="canvasContainer">
+        <canvas id="bookCanvas"></canvas>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/exporters/GLTFExporter.js"></script>
+    <script src="https://cdn.jsdelivr.net/gh/mrdoob/three.js@r128/examples/js/controls/OrbitControls.js"></script>
+    <script src="https://unpkg.com/ccapture.js@1.1.0/build/CCapture.all.min.js"></script>
+
+    <script>
+        let scene, camera, renderer, bookMesh, controls;
+        let currentCoverTexture = null;
+        let currentCoverImageDimensions = { width: 0, height: 0 };
+        let currentBackgroundImageOriginalDimensions = { width: 0, height: 0 };
+
+        const bookCoverWidthInput = document.getElementById('bookCoverWidth');
+        const bookHeightInput = document.getElementById('bookHeight');
+        const spineWidthInput = document.getElementById('spineWidth');
+        const coverUploadInput = document.getElementById('coverUpload');
+        const pageColorInput = document.getElementById('pageColor');
+        const updateButton = document.getElementById('updateButton');
+        const downloadButton = document.getElementById('downloadGlb');
+        const canvas = document.getElementById('bookCanvas');
+        const canvasContainer = document.getElementById('canvasContainer');
+        const videoSizeSelect = document.getElementById('videoSize');
+        const renderVideoButton = document.getElementById('renderVideoButton');
+        const backgroundUploadInput = document.getElementById('backgroundUpload');
+        const backgroundScaleInput = document.getElementById('backgroundScale');
+        const backgroundOffsetXInput = document.getElementById('backgroundOffsetX');
+        const backgroundOffsetYInput = document.getElementById('backgroundOffsetY');
+        const renderStatusDiv = document.getElementById('renderStatus');
+
+        const allControls = [
+            bookCoverWidthInput, bookHeightInput, spineWidthInput, coverUploadInput,
+            pageColorInput, updateButton, downloadButton, videoSizeSelect,
+            renderVideoButton, backgroundUploadInput, backgroundScaleInput,
+            backgroundOffsetXInput, backgroundOffsetYInput
+        ];
+
+        function init() {
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0xdddddd); // Default background
+
+            camera = new THREE.PerspectiveCamera(50, canvasContainer.clientWidth / canvasContainer.clientHeight, 0.1, 1000);
+            camera.position.set(0, 0, -20); 
+
+            renderer = new THREE.WebGLRenderer({ canvas: canvas, antialias: true, preserveDrawingBuffer: true });
+            renderer.setSize(canvasContainer.clientWidth, canvasContainer.clientHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.outputColorSpace = THREE.SRGBColorSpace; // For correct output colors
+
+            // Lighting (Improved)
+            const ambientLight = new THREE.AmbientLight(0xffffff, 0.3); // Softer ambient
+            scene.add(ambientLight);
+
+            const hemisphereLight = new THREE.HemisphereLight(0xffffff, 0x888888, 0.5); // Sky, Ground, Intensity
+            hemisphereLight.position.set(0, 20, 0);
+            scene.add(hemisphereLight);
+
+            const directionalLightFront = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLightFront.position.set(7, 10, -15); // Angled to hit front and top/side
+            scene.add(directionalLightFront);
+            const directionalLightBack = new THREE.DirectionalLight(0xffffff, 0.5);
+            directionalLightBack.position.set(7, 10, 15); // Angled to hit front and top/side
+            scene.add(directionalLightBack);
+
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.minDistance = 5;
+            controls.maxDistance = 100;
+            controls.target.set(0,0,0);
+
+            updateImageSpecOutput(); // Initial calculation
+            buildBookMesh(); // Initial placeholder book
+
+            animate();
+
+            updateButton.addEventListener('click', handleUpdate);
+            downloadButton.addEventListener('click', downloadGLB);
+            window.addEventListener('resize', onWindowResize);
+            bookCoverWidthInput.addEventListener('input', updateImageSpecOutput);
+            bookHeightInput.addEventListener('input', updateImageSpecOutput);
+            spineWidthInput.addEventListener('input', updateImageSpecOutput);
+            renderVideoButton.addEventListener('click', render360Video);
+            backgroundUploadInput.addEventListener('change', handleBackgroundImageUpload);
+            backgroundScaleInput.addEventListener('input', updateBackgroundScale);
+            backgroundOffsetXInput.addEventListener('input', updateBackgroundScale);
+            backgroundOffsetYInput.addEventListener('input', updateBackgroundScale);
+            videoSizeSelect.addEventListener('change', applyCanvasAspectRatio);
+        }
+
+        function handleUpdate() {
+            const file = coverUploadInput.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const textureLoader = new THREE.TextureLoader();
+                    textureLoader.load(e.target.result, function(texture) {
+                        if (currentCoverTexture) {
+                            currentCoverTexture.dispose();
+                        }
+                        currentCoverTexture = texture;
+                        currentCoverTexture.colorSpace = THREE.SRGBColorSpace; // Input texture color space
+                        currentCoverImageDimensions.width = currentCoverTexture.image.naturalWidth || currentCoverTexture.image.width;
+                        currentCoverImageDimensions.height = currentCoverTexture.image.naturalHeight || currentCoverTexture.image.height;
+                        buildBookMesh();
+                    });
+                }
+                reader.readAsDataURL(file);
+            } else {
+                // If no new file, just update dimensions/colors with existing texture (or default)
+                buildBookMesh();
+            }
+            updateImageSpecOutput(); // Update specs based on potentially new dimensions
+        }
+
+        function buildBookMesh() {
+            if (bookMesh) {
+                scene.remove(bookMesh);
+                bookMesh.geometry.dispose();
+                if (Array.isArray(bookMesh.material)) {
+                    bookMesh.material.forEach(mat => {
+                        if (mat.map) mat.map.dispose();
+                        mat.dispose();
+                    });
+                } else if (bookMesh.material) {
+                    if (bookMesh.material.map) bookMesh.material.map.dispose();
+                    bookMesh.material.dispose();
+                }
+            }
+
+            const coverW_dim = parseFloat(bookCoverWidthInput.value) || 15;
+            const bookH_dim = parseFloat(bookHeightInput.value) || 23;
+            const spineW_dim = parseFloat(spineWidthInput.value) || 2.5;
+            const pageCol = new THREE.Color(pageColorInput.value);
+
+            // Geometry: BoxGeometry(width, height, depth)
+            // Our book: CoverWidth (X), CoverHeight (Y), SpineWidth/Thickness (Z)
+            const geometry = new THREE.BoxGeometry(coverW_dim, bookH_dim, spineW_dim);
+            
+            const materials = [];
+            // Material order for BoxGeometry: [+X (Right), -X (Left), +Y (Top), -Y (Bottom), +Z (Front), -Z (Back)]
+            // Our mapping:
+            // +X face: Spine (dims: spineW_dim x bookH_dim)
+            // -X face: Page edge opposite spine
+            // +Y face: Top page edge (dims: coverW_dim x spineW_dim)
+            // -Y face: Bottom page edge
+            // +Z face: Front Cover (dims: coverW_dim x bookH_dim)
+            // -Z face: Back Cover (dims: coverW_dim x bookH_dim)
+
+            const pageMaterial = new THREE.MeshStandardMaterial({ color: pageCol, roughness: 0.9, metalness: 0.05 });
+            const defaultCoverMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.7, metalness: 0.1 });
+
+            // Total physical width of the spread layout (Front | Spine | Back)
+            const totalSpreadPhysicalW = coverW_dim + spineW_dim + coverW_dim;
+
+            if (currentCoverTexture && currentCoverImageDimensions.width > 0 && currentCoverImageDimensions.height > 0) {
+                const imgOriginalW = currentCoverImageDimensions.width;
+                const imgOriginalH = currentCoverImageDimensions.height;
+
+                // Helper function to create a textured material with "cover" behavior
+                const createCoverPartMaterial = (bookPartW, bookPartH, texSegmentStartU, texSegmentWidthU) => {
+                    const material = new THREE.MeshStandardMaterial({ roughness: 0.7, metalness: 0.1 });
+                    const tex = currentCoverTexture.clone();
+                    tex.needsUpdate = true; // Important when cloning for unique transform
+
+                    const segmentPixelW = texSegmentWidthU * imgOriginalW;
+                    const segmentPixelH = imgOriginalH; // Each segment uses full image height
+
+                    const aspectSegment = segmentPixelW / segmentPixelH;
+                    const aspectFace = bookPartW / bookPartH;
+
+                    let repeatU_for_segment = 1.0;
+                    let repeatV_for_segment = 1.0;
+                    let offsetU_in_segment = 0.0;
+                    let offsetV_in_segment = 0.0;
+
+                    if (aspectSegment > aspectFace) { // Segment is wider than face. Fit height, crop width.
+                        repeatU_for_segment = aspectFace / aspectSegment;
+                        offsetU_in_segment = (1.0 - repeatU_for_segment) / 2.0;
+                    } else { // Segment is taller/squarer than face. Fit width, crop height.
+                        repeatV_for_segment = aspectSegment / aspectFace;
+                        offsetV_in_segment = (1.0 - repeatV_for_segment) / 2.0;
+                    }
+                    
+                    tex.repeat.set(texSegmentWidthU * repeatU_for_segment, repeatV_for_segment);
+                    tex.offset.set(texSegmentStartU + (texSegmentWidthU * offsetU_in_segment), offsetV_in_segment);
+                    
+                    material.map = tex;
+                    return material;
+                };
+
+                // Order: Front | Spine | Back
+                // Front Cover (+Z face)
+                const frontTexSegmentStartU = 0;
+                const frontTexSegmentWidthU = coverW_dim / totalSpreadPhysicalW;
+                const frontMaterial = createCoverPartMaterial(coverW_dim, bookH_dim, frontTexSegmentStartU, frontTexSegmentWidthU);
+
+                // Spine (+X face)
+                const spineTexSegmentStartU = frontTexSegmentWidthU;
+                const spineTexSegmentWidthU = spineW_dim / totalSpreadPhysicalW;
+                const spineMaterial = createCoverPartMaterial(spineW_dim, bookH_dim, spineTexSegmentStartU, spineTexSegmentWidthU);
+                
+                // Back Cover (-Z face)
+                const backTexSegmentStartU = spineTexSegmentStartU + spineTexSegmentWidthU;
+                const backTexSegmentWidthU = coverW_dim / totalSpreadPhysicalW; // Same as front width
+                const backMaterial = createCoverPartMaterial(coverW_dim, bookH_dim, backTexSegmentStartU, backTexSegmentWidthU);
+                
+                materials.push(spineMaterial);      // +X face (Spine)
+                materials.push(pageMaterial);       // -X face (Page edge opposite spine)
+                materials.push(pageMaterial);       // +Y face (Top page edge)
+                materials.push(pageMaterial);       // -Y face (Bottom page edge)
+                materials.push(frontMaterial);      // +Z face (Front Cover)
+                materials.push(backMaterial);       // -Z face (Back Cover)
+
+            } else {
+                // Default materials if no texture
+                materials.push(defaultCoverMaterial); // Spine
+                materials.push(pageMaterial);         // Opposite Spine Edge
+                materials.push(pageMaterial);         // Top Edge
+                materials.push(pageMaterial);         // Bottom Edge
+                materials.push(defaultCoverMaterial); // Front
+                materials.push(defaultCoverMaterial); // Back
+            }
+            
+            bookMesh = new THREE.Mesh(geometry, materials);
+            scene.add(bookMesh);
+            
+            const maxSize = Math.max(coverW_dim, bookH_dim, spineW_dim);
+            const cameraDistance = maxSize * 2.5; // Adjust multiplier as needed
+            camera.position.set(maxSize * 0.5, maxSize * 0.3, cameraDistance);
+            controls.target.set(0, 0, 0);
+            controls.minDistance = maxSize * 0.8;
+            controls.maxDistance = maxSize * 10;
+            controls.update();
+        }
+
+        function updateImageSpecOutput() {
+            const coverW = parseFloat(bookCoverWidthInput.value) || 0;
+            const bookH = parseFloat(bookHeightInput.value) || 0;
+            const spineW = parseFloat(spineWidthInput.value) || 0;
+
+            const aspectRatioEl = document.getElementById('idealAspectRatio');
+            const resolutionsListEl = document.getElementById('sampleResolutions');
+            resolutionsListEl.innerHTML = ''; // Clear previous
+
+            if (coverW <= 0 || bookH <= 0 || spineW < 0) { // spineW can be 0
+                aspectRatioEl.textContent = "N/A (Invalid dimensions)";
+                const li = document.createElement('li');
+                li.textContent = "Enter valid book dimensions.";
+                resolutionsListEl.appendChild(li);
+                return;
+            }
+
+            const totalSpreadW_units = coverW + spineW + coverW;
+            const idealAR = totalSpreadW_units / bookH;
+            aspectRatioEl.textContent = idealAR.toFixed(3);
+
+            const addResolution = (label, w_px, h_px) => {
+                if (w_px > 0 && h_px > 0) {
+                    const li = document.createElement('li');
+                    li.textContent = `${label}: ~${Math.round(w_px)}px wide × ${Math.round(h_px)}px tall`;
+                    resolutionsListEl.appendChild(li);
+                }
+            };
+            
+            // Input dimensions are in cm. For DPI calculation, convert cm to inches (1 inch = 2.54 cm).
+            addResolution("300 DPI (based on cm input)", (totalSpreadW_units / 2.54) * 300, (bookH / 2.54) * 300);
+            addResolution("150 DPI (based on cm input)", (totalSpreadW_units / 2.54) * 150, (bookH / 2.54) * 150);
+            
+            // Web-friendly examples
+            const webH_large = 1500;
+            addResolution("Web (1500px tall)", webH_large * idealAR, webH_large);
+            const webH_medium = 1000;
+            addResolution("Web (1000px tall)", webH_medium * idealAR, webH_medium);
+
+            if (resolutionsListEl.children.length === 0) {
+                 const li = document.createElement('li');
+                 li.textContent = "Could not calculate samples. Check dimensions.";
+                 resolutionsListEl.appendChild(li);
+            }
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+            renderer.render(scene, camera);
+        }
+
+        function downloadGLB() {
+            if (!bookMesh) {
+                alert("Please create a book mockup first by updating the view.");
+                return;
+            }
+            const exporter = new THREE.GLTFExporter();
+            const exportScene = new THREE.Scene(); // Export only the book
+            const bookClone = bookMesh.clone(true); // Deep clone
+            exportScene.add(bookClone);
+
+            // Ensure materials are properly cloned, especially maps
+            if (Array.isArray(bookMesh.material)) {
+                bookClone.material = bookMesh.material.map(mat => {
+                    const clonedMat = mat.clone();
+                    if (mat.map) {
+                        // The texture itself is shared, which is fine for GLB.
+                        // If unique texture instances were needed per face in GLB (rare),
+                        // more complex cloning of textures would be required.
+                        // For this use case, sharing the main texture (if used) is efficient.
+                        clonedMat.map = mat.map; // Point to the same texture instance
+                    }
+                    return clonedMat;
+                });
+            } else if (bookMesh.material.map) {
+                bookClone.material = bookMesh.material.clone();
+                bookClone.material.map = bookMesh.material.map;
+            }
+
+
+            exporter.parse(
+                exportScene,
+                function (gltf) {
+                    const blob = new Blob([gltf], { type: 'model/gltf-binary' });
+                    const link = document.createElement('a');
+                    link.href = URL.createObjectURL(blob);
+                    link.download = 'book_mockup.glb';
+                    link.click();
+                    URL.revokeObjectURL(link.href);
+                },
+                function (error) {
+                    console.error('An error happened during GLTF export:', error);
+                    alert('Error exporting GLB. Check console.');
+                },
+                { binary: true, animations: scene.animations }
+            );
+        }
+
+        function onWindowResize() {
+            applyCanvasAspectRatio();
+        }
+        
+        /**
+         * Applies the selected aspect ratio to the live canvas.
+         */
+        function applyCanvasAspectRatio() {
+            const selectedValue = videoSizeSelect.value;
+            const currentCanvasWidth = canvasContainer.clientWidth; // Get current width based on CSS
+            let newHeight;
+
+            const aspectRatio = getAspectRatioFromSelection(selectedValue);
+
+            if (aspectRatio && currentCanvasWidth > 0) {
+                newHeight = currentCanvasWidth / aspectRatio;
+                canvasContainer.style.height = newHeight + 'px';
+            } else { // default_responsive or invalid aspect ratio
+                canvasContainer.style.height = '450px'; // Revert to CSS default height
+                newHeight = canvasContainer.clientHeight; // Use the actual height
+            }
+            
+            // Always use the container's current clientWidth for the renderer's width
+            // and the calculated or default newHeight for the renderer's height.
+            if (renderer && camera && currentCanvasWidth > 0 && newHeight > 0) {
+                renderer.setSize(currentCanvasWidth, newHeight);
+                camera.aspect = currentCanvasWidth / newHeight;
+                camera.updateProjectionMatrix();
+            }
+            if (scene.background && scene.background.isTexture) {
+                updateBackgroundScale(); // Update background scale/fit when canvas aspect ratio changes
+            }
+        }
+
+        /**
+         * Handles the background image upload.
+         * @param {Event} event - The file input change event.
+         */
+        function handleBackgroundImageUpload(event) {
+            const file = event.target.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    const textureLoader = new THREE.TextureLoader();
+                    textureLoader.load(e.target.result, function(loadedTexture) {
+                        if (scene.background && scene.background.isTexture) {
+                            scene.background.dispose();
+                        }
+                        scene.background = loadedTexture;
+                        currentBackgroundImageOriginalDimensions.width = loadedTexture.image.naturalWidth || loadedTexture.image.width;
+                        currentBackgroundImageOriginalDimensions.height = loadedTexture.image.naturalHeight || loadedTexture.image.height;
+                        
+                        scene.background.wrapS = THREE.ClampToEdgeWrapping;
+                        scene.background.wrapT = THREE.ClampToEdgeWrapping;
+                        backgroundOffsetXInput.value = 0; // Reset offset sliders
+                        backgroundOffsetYInput.value = 0;
+                        updateBackgroundScale(); // Apply initial scale, fit, and reset offsets
+                    });
+                }
+                reader.readAsDataURL(file);
+            } else {
+                // No file selected (e.g., user cleared the input)
+                if (scene.background && scene.background.isTexture) {
+                    scene.background.dispose();
+                }
+                scene.background = new THREE.Color(0xdddddd); // Reset to default color
+                backgroundScaleInput.value = 1;
+                backgroundOffsetXInput.value = 0;
+                backgroundOffsetYInput.value = 0;
+            }
+        }
+
+        /**
+         * Updates the scale of the background image texture.
+         */
+        function updateBackgroundScale() {
+            if (!scene.background || !scene.background.isTexture || !currentBackgroundImageOriginalDimensions.width || !currentBackgroundImageOriginalDimensions.height) {
+                return;
+            }
+
+            const scaleFactor = parseFloat(backgroundScaleInput.value);
+            const userOffsetX = parseFloat(backgroundOffsetXInput.value);
+            const userOffsetY = parseFloat(backgroundOffsetYInput.value);
+
+            const texture = scene.background;
+            const imgOriginalWidth = currentBackgroundImageOriginalDimensions.width;
+            const imgOriginalHeight = currentBackgroundImageOriginalDimensions.height;
+            const imageAspect = imgOriginalWidth / imgOriginalHeight;
+
+            const canvasWidth = canvasContainer.clientWidth;
+            const canvasHeight = canvasContainer.clientHeight;
+            if (canvasWidth === 0 || canvasHeight === 0) return;
+            const canvasAspect = canvasWidth / canvasHeight;
+
+            let baseRepeatX = 1;
+            let baseRepeatY = 1;
+
+            if (imageAspect > canvasAspect) {
+                baseRepeatY = 1;
+                baseRepeatX = canvasAspect / imageAspect;
+            } else {
+                baseRepeatX = 1;
+                baseRepeatY = imageAspect / canvasAspect;
+            }
+            
+            const finalRepeatX = baseRepeatX / scaleFactor;
+            const finalRepeatY = baseRepeatY / scaleFactor;
+            texture.repeat.set(finalRepeatX, finalRepeatY);
+            
+            // Calculate centered offset and then add user's offset
+            // Note: User Y offset might feel inverted depending on texture coordinates, adjust if needed.
+            // Typically, positive Y offset in textures moves the image "down" (revealing more of the top).
+            const centeredOffsetX = (1 - finalRepeatX) / 2;
+            const centeredOffsetY = (1 - finalRepeatY) / 2;
+            
+            texture.offset.set(centeredOffsetX + userOffsetX, centeredOffsetY - userOffsetY); // Subtracting userOffsetY to make positive Y move image up
+            
+            texture.needsUpdate = true;
+        }
+
+        /**
+         * @typedef {Object} VideoDimensions
+         * @property {number} width
+         * @property {number} height
+         */
+
+        /**
+         * Gets the aspect ratio (width/height) from the selection.
+         * @param {string} selectedValue - The value from the videoSizeSelect dropdown.
+         * @returns {number | null} The aspect ratio or null for default.
+         */
+        function getAspectRatioFromSelection(selectedValue) {
+            switch (selectedValue) {
+                case 'instagram_post_1080x1080': // 1:1
+                    return 1080 / 1080;
+                case 'instagram_story_1080x1920': // 9:16
+                    return 1080 / 1920;
+                case 'hd_720p_1280x720': // 16:9
+                    return 1280 / 720;
+                case 'hd_1080p_1920x1080': // 16:9
+                    return 1920 / 1080;
+                case 'default_responsive':
+                default:
+                    return null; // Indicates to use default CSS height
+            }
+        }
+
+        /**
+         * Gets the target video output dimensions (width, height) from the selection.
+         * @param {string} selectedValue - The value from the videoSizeSelect dropdown.
+         * @returns {VideoDimensions} The dimensions. Falls back to current canvas if not a specific format.
+         */
+        function getVideoOutputDimensions(selectedValue) {
+            switch (selectedValue) {
+                case 'instagram_post_1080x1080':
+                    return { width: 1080, height: 1080 };
+                case 'instagram_story_1080x1920':
+                    return { width: 1080, height: 1920 };
+                case 'hd_720p_1280x720':
+                    return { width: 1280, height: 720 };
+                case 'hd_1080p_1920x1080':
+                    return { width: 1920, height: 1080 };
+                case 'default_responsive':
+                default: // Fallback to current canvas size for video if default is chosen
+                    return { width: canvasContainer.clientWidth, height: canvasContainer.clientHeight };
+            }
+        }
+
+
+        /**
+         * Disables all interactive controls.
+         */
+        function disableAllControls() {
+            allControls.forEach(control => control.disabled = true);
+            renderStatusDiv.textContent = 'Initializing...';
+        }
+
+        /**
+         * Enables all interactive controls.
+         */
+        function enableAllControls() {
+            allControls.forEach(control => control.disabled = false);
+            // renderStatusDiv.textContent = ''; // Clear status or set to a default
+        }
+
+        /**
+         * Renders a 360-degree video of the book mockup.
+         */
+        async function render360Video() {
+            if (!bookMesh) {
+                alert("Please create a book mockup first by updating the view.");
+                return;
+            }
+            if (typeof CCapture === 'undefined') {
+                alert("Video capture library (CCapture.js) is not loaded. Please check your internet connection or if the library URL is correct.");
+                console.error("CCapture is not defined. Ensure CCapture.all.min.js is loaded.");
+                return;
+            }
+
+            disableAllControls();
+            renderStatusDiv.textContent = 'Preparing video render...';
+
+            const selectedValue = videoSizeSelect.value;
+            const outputDimensions = getVideoOutputDimensions(selectedValue);
+            const captureWidth = outputDimensions.width;
+            const captureHeight = outputDimensions.height;
+
+            const framerate = 30;
+            const durationSeconds = 5;
+            const totalFrames = framerate * durationSeconds;
+            let currentFrame = 0;
+            const rotationPerFrame = (2 * Math.PI) / totalFrames;
+
+            // Save current renderer state to restore later
+            const originalRendererSize = new THREE.Vector2();
+            renderer.getSize(originalRendererSize);
+            const originalAspect = camera.aspect;
+            const originalBookRotationY = bookMesh.rotation.y;
+            
+            controls.enabled = false; // Disable orbit controls during capture
+
+            // Temporarily set renderer to video output dimensions
+            renderer.setSize(captureWidth, captureHeight);
+            camera.aspect = captureWidth / captureHeight;
+            camera.updateProjectionMatrix();
+
+            const capturer = new CCapture({
+                format: 'webm',
+                framerate: framerate,
+                quality: 90,
+                verbose: false,
+                name: 'book_360_video_' + selectedValue,
+            });
+
+            console.log(`Starting video capture: ${captureWidth}x${captureHeight}, ${framerate}fps, ${durationSeconds}s. Selected option: ${selectedValue}`);
+            renderStatusDiv.textContent = `Rendering video (0%)... Frame 0/${totalFrames}`;
+            capturer.start();
+            
+            bookMesh.rotation.y = 0; // Start rotation from 0
+
+            function captureFrame() {
+                if (currentFrame < totalFrames) {
+                    requestAnimationFrame(captureFrame);
+                    bookMesh.rotation.y += rotationPerFrame;
+                    renderer.render(scene, camera);
+                    capturer.capture(renderer.domElement);
+                    currentFrame++;
+                    const progressPercent = Math.round((currentFrame / totalFrames) * 100);
+                    renderStatusDiv.textContent = `Rendering video (${progressPercent}%)... Frame ${currentFrame}/${totalFrames}`;
+                } else {
+                    renderStatusDiv.textContent = 'Processing video... Please wait.';
+                    capturer.stop();
+                    
+                    // Restore original renderer size, camera aspect, and book rotation
+                    renderer.setSize(originalRendererSize.x, originalRendererSize.y);
+                    camera.aspect = originalAspect;
+                    camera.updateProjectionMatrix();
+                    bookMesh.rotation.y = originalBookRotationY;
+                    controls.enabled = true; // Re-enable orbit controls
+                    
+                    // A final render with restored settings to update the live canvas
+                    renderer.render(scene, camera);
+
+                    console.log("Video capture processing finished. Getting blob via capturer.save()...");
+                    capturer.save(async (blob) => { // CCapture's save method provides the blob
+                        if (blob && blob.size > 0) {
+                            console.log("Blob received from capturer.save(). Size:", blob.size);
+                            renderStatusDiv.textContent = 'Video ready! Preparing to share/download...';
+                            await handleVideoOutput(blob, selectedValue); // handleVideoOutput will update status further
+                        } else {
+                            console.error("Failed to get blob or blob is empty from capturer.save(). Blob:", blob);
+                            alert("Error: Could not process the video, or the video is empty. Please try again.");
+                            renderStatusDiv.textContent = 'Error processing video.';
+                        }
+                        enableAllControls(); // Re-enable controls after handling output or error
+                    });
+                }
+            }
+            captureFrame();
+        }
+
+        /**
+         * Downloads a blob to the user's device.
+         * @param {Blob} blob - The blob to download.
+         * @param {string} filename - The desired filename for the download.
+         */
+        function downloadBlob(blob, filename) {
+            const url = URL.createObjectURL(blob);
+            const link = document.createElement('a');
+            link.href = url;
+            link.download = filename;
+            document.body.appendChild(link);
+            link.click();
+            document.body.removeChild(link);
+            URL.revokeObjectURL(url);
+            console.log(`Video downloaded: ${filename}`);
+        }
+
+        /**
+         * Handles the output of the captured video, attempting to share or falling back to download.
+         * @param {Blob} blob - The video blob.
+         * @param {string} selectedValue - The selected video size value, used for filename.
+         */
+        async function handleVideoOutput(blob, selectedValue) {
+            const filename = `book_360_video_${selectedValue}.webm`;
+            // renderStatusDiv is already "Video ready! Preparing to share/download..." or similar from caller
+
+            // Blob validity is checked by the caller (capturer.save callback)
+            // but a quick check here doesn't hurt, though it should ideally not be necessary.
+            if (!blob || blob.size === 0) {
+                console.error("handleVideoOutput called with invalid blob. Size:", blob ? blob.size : 'null');
+                alert("Internal Error: Video data is invalid. Cannot share or download.");
+                renderStatusDiv.textContent = 'Error: Invalid video data.';
+                return; // enableAllControls is handled by the caller
+            }
+
+            const fileToShare = new File([blob], filename, { type: 'video/webm' });
+            const shareData = {
+                files: [fileToShare],
+                title: 'Book Mockup Video',
+                text: 'Check out this 360 video of my book mockup!',
+            };
+
+            if (navigator.share && typeof navigator.canShare === 'function' && navigator.canShare({ files: [fileToShare] })) {
+                try {
+                    await navigator.share(shareData);
+                    console.log('Video shared successfully or share dialog opened.');
+                    renderStatusDiv.textContent = 'Share action initiated. Check your device for the share dialog.';
+                } catch (err) {
+                    console.error('Error sharing video:', err.name, err.message);
+                    if (err.name !== 'AbortError') {
+                        renderStatusDiv.textContent = 'Sharing failed. Downloading video...';
+                        alert('Could not share the video. It will be downloaded instead.');
+                        downloadBlob(blob, filename);
+                        renderStatusDiv.textContent = 'Video downloaded. Check your browser\'s downloads to open.';
+                    } else {
+                        renderStatusDiv.textContent = 'Sharing cancelled by user.';
+                        alert('Sharing cancelled. The video was not downloaded.');
+                    }
+                }
+            } else {
+                renderStatusDiv.textContent = 'Web Share not available. Downloading video...';
+                alert('Web Share API not supported or cannot share this file type on this browser/device. The video will be downloaded.');
+                downloadBlob(blob, filename);
+                renderStatusDiv.textContent = 'Video downloaded. Check your browser\'s downloads to open.';
+            }
+        }
+        
+        // Initial setup
+        init();
+        applyCanvasAspectRatio(); // Set initial canvas aspect ratio
+    </script>
+</body>
+</html>
