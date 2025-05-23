@@ -32,6 +32,22 @@
             max-width: 450px; /* Adjusted for side-by-side layout */
             box-sizing: border-box;
         }
+        #backgroundPreviewContainer {
+            margin-top:15px;
+            margin-bottom:15px;
+            border:1px solid #eee;
+            padding:10px;
+            border-radius:4px;
+        }
+        #backgroundPreviewCanvas {
+            border:1px solid #ccc;
+            width:100%;
+            height:auto;
+            aspect-ratio: 16/9; /* Default aspect ratio, can be adjusted */
+            background-color: #f0f0f0;
+            margin-bottom: 10px;
+            display: block; /* Ensures it takes full width and respects margins */
+        }
         label {
             display: block;
             margin-top: 10px;
@@ -107,10 +123,23 @@
             <label for="spineWidth">Spine Width (cm):</label>
             <input type="number" id="spineWidth" value="2.5" step="0.1">
 
-            <label for="backgroundUpload">Upload Background Image (Optional):</label>
+            <label for="backgroundUpload">Upload Background Image:</label>
             <input type="file" id="backgroundUpload" accept="image/*">
 
-            <label for="backgroundScale">Background Image Scale:</label>
+            <div id="backgroundPreviewContainer">
+                <label>Background Preview & Adjustments:</label>
+                <canvas id="backgroundPreviewCanvas" width="400" height="225"></canvas>
+                
+                <label for="backgroundOpacity">Opacity:</label>
+                <input type="range" id="backgroundOpacity" min="0" max="1" step="0.01" value="1">
+                
+                <label for="backgroundBlur">Blur (px):</label>
+                <input type="range" id="backgroundBlur" min="0" max="20" step="0.5" value="0">
+                
+                <button id="applyEditedBackgroundButton" style="margin-top:10px;">Apply Edited Background to 3D Scene</button>
+            </div>
+
+            <label for="backgroundScale">Background Image Scale (Applied to 3D Scene):</label>
             <input type="range" id="backgroundScale" min="0.1" max="5" step="0.05" value="1">
 
             <label for="backgroundOffsetX">Background X Offset:</label>
@@ -182,6 +211,7 @@
         let currentCoverTexture = null;
         let currentCoverImageDimensions = { width: 0, height: 0 };
         let currentBackgroundImageOriginalDimensions = { width: 0, height: 0 };
+        let originalBackgroundImageDataUrl = null; // To store the raw uploaded background image
 
         const bookCoverWidthInput = document.getElementById('bookCoverWidth');
         const bookHeightInput = document.getElementById('bookHeight');
@@ -200,11 +230,19 @@
         const backgroundOffsetYInput = document.getElementById('backgroundOffsetY');
         const renderStatusDiv = document.getElementById('renderStatus');
 
+        // New background preview controls
+        const backgroundPreviewCanvas = document.getElementById('backgroundPreviewCanvas');
+        const backgroundOpacityInput = document.getElementById('backgroundOpacity');
+        const backgroundBlurInput = document.getElementById('backgroundBlur');
+        const applyEditedBackgroundButton = document.getElementById('applyEditedBackgroundButton');
+
+
         const allControls = [
             bookCoverWidthInput, bookHeightInput, spineWidthInput, coverUploadInput,
             pageColorInput, updateButton, downloadButton, videoSizeSelect,
             renderVideoButton, backgroundUploadInput, backgroundScaleInput,
-            backgroundOffsetXInput, backgroundOffsetYInput
+            backgroundOffsetXInput, backgroundOffsetYInput,
+            backgroundOpacityInput, backgroundBlurInput, applyEditedBackgroundButton // Add new controls here
         ];
 
         function init() {
@@ -258,7 +296,138 @@
             backgroundOffsetXInput.addEventListener('input', updateBackgroundScale);
             backgroundOffsetYInput.addEventListener('input', updateBackgroundScale);
             videoSizeSelect.addEventListener('change', applyCanvasAspectRatio);
+
+            // Listeners for new background controls
+            backgroundOpacityInput.addEventListener('input', drawBackgroundPreview);
+            backgroundBlurInput.addEventListener('input', drawBackgroundPreview);
+            applyEditedBackgroundButton.addEventListener('click', applyEditedBackgroundToScene);
+
+            drawBackgroundPreview(); // Initialize the preview canvas state
         }
+
+
+        /**
+         * Draws the uploaded background image to the 2D preview canvas with current opacity and blur settings.
+         */
+        function drawBackgroundPreview() {
+            if (!originalBackgroundImageDataUrl) {
+                const ctx = backgroundPreviewCanvas.getContext('2d');
+                ctx.clearRect(0, 0, backgroundPreviewCanvas.width, backgroundPreviewCanvas.height);
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, backgroundPreviewCanvas.width, backgroundPreviewCanvas.height);
+                ctx.fillStyle = '#aaa';
+                ctx.textAlign = 'center';
+                ctx.fillText("No image uploaded", backgroundPreviewCanvas.width / 2, backgroundPreviewCanvas.height / 2);
+                return;
+            }
+
+            const img = new Image();
+            img.onload = () => {
+                const ctx = backgroundPreviewCanvas.getContext('2d');
+                const canvas = backgroundPreviewCanvas;
+                const opacity = parseFloat(backgroundOpacityInput.value);
+                const blur = parseFloat(backgroundBlurInput.value);
+
+                // Set canvas drawing size to match its display size for clarity if needed,
+                // but for toDataURL, intrinsic size is fine. Let's use its set width/height.
+                // canvas.width = canvas.clientWidth; // Optional: if you want drawing to match CSS displayed size
+                // canvas.height = canvas.clientHeight;
+
+                ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+                // Fill with the same background color as the 3D scene's default
+                // so that opacity blends correctly into an opaque image for scene.background
+                ctx.fillStyle = '#dddddd';
+                ctx.fillRect(0, 0, canvas.width, canvas.height);
+                
+                ctx.save(); // Save context state (for alpha and filter)
+
+                ctx.globalAlpha = opacity;
+                if (blur > 0) {
+                    ctx.filter = `blur(${blur}px)`;
+                } else {
+                    ctx.filter = 'none';
+                }
+
+                // Draw image to cover canvas, maintaining aspect ratio
+                const imgAspect = img.width / img.height;
+                const canvasAspect = canvas.width / canvas.height;
+                let drawWidth, drawHeight, offsetX, offsetY;
+
+                if (imgAspect > canvasAspect) { // Image is wider than canvas
+                    drawHeight = canvas.height;
+                    drawWidth = imgAspect * drawHeight;
+                    offsetX = (canvas.width - drawWidth) / 2;
+                    offsetY = 0;
+                } else { // Image is taller than canvas (or same aspect)
+                    drawWidth = canvas.width;
+                    drawHeight = drawWidth / imgAspect;
+                    offsetX = 0;
+                    offsetY = (canvas.height - drawHeight) / 2;
+                }
+                
+                ctx.drawImage(img, offsetX, offsetY, drawWidth, drawHeight);
+                
+                ctx.restore(); // Restore context state (removes filter and alpha for subsequent draws if any)
+            };
+            img.onerror = () => {
+                console.error("Error loading image for preview.");
+                const ctx = backgroundPreviewCanvas.getContext('2d');
+                ctx.clearRect(0, 0, backgroundPreviewCanvas.width, backgroundPreviewCanvas.height);
+                ctx.fillStyle = '#f0f0f0';
+                ctx.fillRect(0, 0, backgroundPreviewCanvas.width, backgroundPreviewCanvas.height);
+                ctx.fillStyle = 'red';
+                ctx.textAlign = 'center';
+                ctx.fillText("Error loading image", backgroundPreviewCanvas.width / 2, backgroundPreviewCanvas.height / 2);
+            }
+            img.src = originalBackgroundImageDataUrl;
+        }
+
+        /**
+         * Applies the content of the backgroundPreviewCanvas (with edits) to the 3D scene.
+         */
+        function applyEditedBackgroundToScene() {
+            if (!originalBackgroundImageDataUrl) {
+                alert("Please upload a background image first.");
+                // Optionally, reset 3D background to default color
+                if (scene.background && scene.background.isTexture) {
+                    scene.background.dispose();
+                }
+                scene.background = new THREE.Color(0xdddddd);
+                currentBackgroundImageOriginalDimensions.width = 0; // Reset dimensions
+                currentBackgroundImageOriginalDimensions.height = 0;
+                updateBackgroundScale(); // Update 3D background (which will be default color)
+                return;
+            }
+
+            // Ensure preview is up-to-date (it should be if controls trigger it, but good practice)
+            // drawBackgroundPreview(); // This might cause a flicker if called synchronously before toDataURL
+
+            const editedImageDataUrl = backgroundPreviewCanvas.toDataURL('image/png');
+            
+            const textureLoader = new THREE.TextureLoader();
+            textureLoader.load(editedImageDataUrl, function(loadedTexture) {
+                if (scene.background && scene.background.isTexture) {
+                    scene.background.dispose();
+                }
+                scene.background = loadedTexture;
+                // For scaling purposes in updateBackgroundScale, we should still use the *original*
+                // dimensions of the uploaded image, not the preview canvas dimensions,
+                // as the preview canvas is just a viewport for editing.
+                // The `currentBackgroundImageOriginalDimensions` should have been set in `handleBackgroundImageUpload`.
+                // If not, we might need to load the original image again to get its dimensions,
+                // but `handleBackgroundImageUpload` should already store them.
+
+                scene.background.wrapS = THREE.ClampToEdgeWrapping;
+                scene.background.wrapT = THREE.ClampToEdgeWrapping;
+                
+                // Reset 3D scene offsets if desired, or let them persist
+                // backgroundOffsetXInput.value = 0;
+                // backgroundOffsetYInput.value = 0;
+                updateBackgroundScale(); // Apply scale/fit to the new 3D background
+            });
+        }
+
 
         function handleUpdate() {
             const file = coverUploadInput.files[0];
@@ -548,32 +717,48 @@
             if (file) {
                 const reader = new FileReader();
                 reader.onload = function(e) {
-                    const textureLoader = new THREE.TextureLoader();
-                    textureLoader.load(e.target.result, function(loadedTexture) {
-                        if (scene.background && scene.background.isTexture) {
-                            scene.background.dispose();
-                        }
-                        scene.background = loadedTexture;
-                        currentBackgroundImageOriginalDimensions.width = loadedTexture.image.naturalWidth || loadedTexture.image.width;
-                        currentBackgroundImageOriginalDimensions.height = loadedTexture.image.naturalHeight || loadedTexture.image.height;
+                    originalBackgroundImageDataUrl = e.target.result; // Store the raw data URL
+
+                    // Load the image to get its original dimensions for the 3D scene scaling later
+                    const tempImg = new Image();
+                    tempImg.onload = () => {
+                        currentBackgroundImageOriginalDimensions.width = tempImg.naturalWidth || tempImg.width;
+                        currentBackgroundImageOriginalDimensions.height = tempImg.naturalHeight || tempImg.height;
                         
-                        scene.background.wrapS = THREE.ClampToEdgeWrapping;
-                        scene.background.wrapT = THREE.ClampToEdgeWrapping;
-                        backgroundOffsetXInput.value = 0; // Reset offset sliders
-                        backgroundOffsetYInput.value = 0;
-                        updateBackgroundScale(); // Apply initial scale, fit, and reset offsets
-                    });
+                        // Now draw to preview canvas
+                        drawBackgroundPreview();
+                        
+                        // Optionally, you might want to immediately apply it to 3D scene as well,
+                        // or wait for the user to click "Apply Edited Background".
+                        // For now, let's just update the preview.
+                        // If you want to apply to 3D immediately (like old behavior but via preview):
+                        // applyEditedBackgroundToScene();
+                    };
+                    tempImg.onerror = () => {
+                        console.error("Error loading image to get dimensions.");
+                         currentBackgroundImageOriginalDimensions.width = 0;
+                         currentBackgroundImageOriginalDimensions.height = 0;
+                         drawBackgroundPreview(); // Draw with error message if needed
+                    };
+                    tempImg.src = originalBackgroundImageDataUrl;
                 }
                 reader.readAsDataURL(file);
             } else {
                 // No file selected (e.g., user cleared the input)
+                originalBackgroundImageDataUrl = null;
+                currentBackgroundImageOriginalDimensions.width = 0;
+                currentBackgroundImageOriginalDimensions.height = 0;
+                drawBackgroundPreview(); // Clear preview or show "no image"
+
+                // Reset 3D scene background as well
                 if (scene.background && scene.background.isTexture) {
                     scene.background.dispose();
                 }
                 scene.background = new THREE.Color(0xdddddd); // Reset to default color
-                backgroundScaleInput.value = 1;
+                backgroundScaleInput.value = 1; // Reset 3D scene scale/offset controls
                 backgroundOffsetXInput.value = 0;
                 backgroundOffsetYInput.value = 0;
+                updateBackgroundScale(); // Update 3D scene background
             }
         }
 
