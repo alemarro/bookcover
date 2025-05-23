@@ -107,63 +107,82 @@
 
     <div id="appContainer">
         <div id="controls">
-            <label for="coverUpload">Upload Cover Image (Spread: Front | Spine | Back):</label>
-            <input type="file" id="coverUpload" accept="image/*">
-            <div class="info">
-                Your image should be a full spread: **Front Cover (left) | Spine (middle) | Back Cover (right)**.
-                The tool will map these sections based on the dimensions below.
+            <div id="bookControlsSection">
+                <h4>Book Settings</h4>
+                <label for="coverUpload">Upload Cover Image (Spread: Front | Spine | Back):</label>
+                <input type="file" id="coverUpload" accept="image/*">
+                <div class="info">
+                    Your image should be a full spread: **Front Cover (left) | Spine (middle) | Back Cover (right)**.
+                    The tool will map these sections based on the dimensions below.
+                </div>
+
+                <label for="bookCoverWidth">Front Cover Width (cm):</label>
+                <input type="number" id="bookCoverWidth" value="15" step="0.1">
+
+                <label for="bookHeight">Cover Height (cm):</label>
+                <input type="number" id="bookHeight" value="23" step="0.1">
+
+                <label for="spineWidth">Spine Width (cm):</label>
+                <input type="number" id="spineWidth" value="2.5" step="0.1">
+
+                <label for="pageColor">Page Edge Color:</label>
+                <input type="color" id="pageColor" value="#f0f0e0">
+                <button id="updateButton">Update Mockup Preview</button>
+                <button id="downloadGlb">Download GLB Model</button>
             </div>
 
-            <label for="bookCoverWidth">Front Cover Width (cm):</label>
-            <input type="number" id="bookCoverWidth" value="15" step="0.1">
+            <hr style="margin: 20px 0;">
 
-            <label for="bookHeight">Cover Height (cm):</label>
-            <input type="number" id="bookHeight" value="23" step="0.1">
+            <div id="backgroundControlsSection">
+                <h4>Background Settings</h4>
+                <label for="backgroundUpload">Upload Background Image:</label>
+                <input type="file" id="backgroundUpload" accept="image/*">
 
-            <label for="spineWidth">Spine Width (cm):</label>
-            <input type="number" id="spineWidth" value="2.5" step="0.1">
+                <div id="backgroundPreviewContainer">
+                    <label>Background Preview & Adjustments:</label>
+                    <canvas id="backgroundPreviewCanvas" width="400" height="225"></canvas>
+                    
+                    <label for="backgroundOpacity">Opacity:</label>
+                    <input type="range" id="backgroundOpacity" min="0" max="1" step="0.01" value="1">
+                    
+                    <label for="backgroundBlur">Blur (px):</label>
+                    <input type="range" id="backgroundBlur" min="0" max="20" step="0.5" value="0">
+                    
+                    <button id="applyEditedBackgroundButton" style="margin-top:10px;">Apply Edited Background to 3D Scene</button>
+                </div>
 
-            <label for="backgroundUpload">Upload Background Image:</label>
-            <input type="file" id="backgroundUpload" accept="image/*">
+                <label for="backgroundScale">Background Image Scale (Applied to 3D Scene):</label>
+                <input type="range" id="backgroundScale" min="0.1" max="5" step="0.05" value="1">
 
-            <div id="backgroundPreviewContainer">
-                <label>Background Preview & Adjustments:</label>
-                <canvas id="backgroundPreviewCanvas" width="400" height="225"></canvas>
-                
-                <label for="backgroundOpacity">Opacity:</label>
-                <input type="range" id="backgroundOpacity" min="0" max="1" step="0.01" value="1">
-                
-                <label for="backgroundBlur">Blur (px):</label>
-                <input type="range" id="backgroundBlur" min="0" max="20" step="0.5" value="0">
-                
-                <button id="applyEditedBackgroundButton" style="margin-top:10px;">Apply Edited Background to 3D Scene</button>
+                <label for="backgroundOffsetX">Background X Offset:</label>
+                <input type="range" id="backgroundOffsetX" min="-1" max="1" step="0.01" value="0">
+
+                <label for="backgroundOffsetY">Background Y Offset:</label>
+                <input type="range" id="backgroundOffsetY" min="-1" max="1" step="0.01" value="0">
             </div>
 
-            <label for="backgroundScale">Background Image Scale (Applied to 3D Scene):</label>
-            <input type="range" id="backgroundScale" min="0.1" max="5" step="0.05" value="1">
+            <hr style="margin: 20px 0;">
 
-            <label for="backgroundOffsetX">Background X Offset:</label>
-            <input type="range" id="backgroundOffsetX" min="-1" max="1" step="0.01" value="0">
+            <div id="renderControlsSection">
+                <h4>Render & Output Settings</h4>
+                <label for="videoSize">Canvas Aspect Ratio:</label>
+                <select id="videoSize">
+                    <option value="default_responsive">Default (Responsive Height)</option>
+                    <option value="instagram_post_1080x1080">Instagram Post (1080x1080)</option>
+                    <option value="instagram_story_1080x1920">Instagram Story (1080x1920)</option>
+                    <option value="hd_720p_1280x720">720p HD (1280x720)</option>
+                    <option value="hd_1080p_1920x1080">1080p HD (1920x1080)</option>
+                </select>
 
-            <label for="backgroundOffsetY">Background Y Offset:</label>
-            <input type="range" id="backgroundOffsetY" min="-1" max="1" step="0.01" value="0">
-            
-            <label for="pageColor">Page Edge Color:</label>
-            <input type="color" id="pageColor" value="#f0f0e0">
+                <label for="videoDuration">Video Duration (seconds):</label>
+                <input type="number" id="videoDuration" value="5" min="1" step="1">
 
-            <label for="videoSize">Canvas Aspect Ratio:</label>
-            <select id="videoSize">
-                <option value="default_responsive">Default (Responsive Height)</option>
-                <option value="instagram_post_1080x1080">Instagram Post (1080x1080)</option>
-                <option value="instagram_story_1080x1920">Instagram Story (1080x1920)</option>
-                <option value="hd_720p_1280x720">720p HD (1280x720)</option>
-                <option value="hd_1080p_1920x1080">1080p HD (1920x1080)</option>
-            </select>
-
-            <button id="renderVideoButton">Render 360 Video</button>
-            <button id="updateButton">Update Mockup</button>
-            <button id="downloadGlb">Download GLB</button>
-            <div id="renderStatus" style="margin-top: 10px; font-weight: bold; min-height: 1.2em;"></div>
+                <label for="videoRotations">Number of Rotations:</label>
+                <input type="number" id="videoRotations" value="1" min="0.5" step="0.5">
+                
+                <button id="renderVideoButton">Render 360 Video</button>
+                <div id="renderStatus" style="margin-top: 10px; font-weight: bold; min-height: 1.2em;"></div>
+            </div>
         </div>
 
         <div id="imageSpecOutputContainer">
@@ -229,6 +248,8 @@
         const backgroundOffsetXInput = document.getElementById('backgroundOffsetX');
         const backgroundOffsetYInput = document.getElementById('backgroundOffsetY');
         const renderStatusDiv = document.getElementById('renderStatus');
+        const videoDurationInput = document.getElementById('videoDuration');
+        const videoRotationsInput = document.getElementById('videoRotations');
 
         // New background preview controls
         const backgroundPreviewCanvas = document.getElementById('backgroundPreviewCanvas');
@@ -242,7 +263,8 @@
             pageColorInput, updateButton, downloadButton, videoSizeSelect,
             renderVideoButton, backgroundUploadInput, backgroundScaleInput,
             backgroundOffsetXInput, backgroundOffsetYInput,
-            backgroundOpacityInput, backgroundBlurInput, applyEditedBackgroundButton // Add new controls here
+            videoDurationInput, videoRotationsInput, // Add new video controls here
+            backgroundOpacityInput, backgroundBlurInput, applyEditedBackgroundButton
         ];
 
         function init() {
@@ -898,10 +920,11 @@
             const captureHeight = outputDimensions.height;
 
             const framerate = 30;
-            const durationSeconds = 5;
+            const durationSeconds = parseFloat(videoDurationInput.value) || 5;
+            const numRotations = parseFloat(videoRotationsInput.value) || 1;
             const totalFrames = framerate * durationSeconds;
             let currentFrame = 0;
-            const rotationPerFrame = (2 * Math.PI) / totalFrames;
+            const rotationPerFrame = (numRotations * 2 * Math.PI) / totalFrames;
 
             // Save current renderer state to restore later
             const originalRendererSize = new THREE.Vector2();
