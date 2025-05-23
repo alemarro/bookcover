@@ -46,7 +46,7 @@ A web-based 3D book mockup generator that creates realistic book visualizations 
 3. Start creating your book mockups!
 
 ### Option 2: Live Demo
-[🌐 Try it live](https://your-username.github.io/book-cover-mockup-generator) *(Update with your GitHub Pages URL)*
+[🌐 Try it live](https://alemarro.github.io/bookcover/) *(Update with your GitHub Pages URL)*
 
 ## 📖 How to Use
 
